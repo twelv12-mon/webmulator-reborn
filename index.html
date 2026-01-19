@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webmulator Pro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a0a2e 50%, #0a0a0a 100%);
+            min-height: 100vh;
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            animation: fadeInDown 0.8s ease;
+        }
+
+        .logo {
+            font-size: 3em;
+            font-weight: bold;
+            background: linear-gradient(45deg, #00f5ff, #ff00ff, #00f5ff);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradient 3s ease infinite;
+            text-shadow: 0 0 30px rgba(0, 245, 255, 0.5);
+        }
+
+        .subtitle {
+            color: #888;
+            margin-top: 10px;
+            font-size: 1.1em;
+        }
+
+        .social-link {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 25px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid #00f5ff;
+            border-radius: 25px;
+            color: #00f5ff;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(0, 245, 255, 0.3);
+        }
+
+        .social-link:hover {
+            background: rgba(0, 245, 255, 0.1);
+            box-shadow: 0 0 30px rgba(0, 245, 255, 0.6);
+            transform: translateY(-2px);
+        }
+
+        .main-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 20px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            animation: fadeInUp 0.8s ease;
+        }
+
+        .upload-zone {
+            border: 3px dashed rgba(0, 245, 255, 0.3);
+            border-radius: 15px;
+            padding: 60px 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-zone::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(0, 245, 255, 0.1) 0%, transparent 70%);
+            animation: pulse 3s ease-in-out infinite;
+        }
+
+        .upload-zone:hover {
+            border-color: #00f5ff;
+            background: rgba(0, 245, 255, 0.05);
+            transform: scale(1.02);
+        }
+
+        .upload-zone[drag="true"] {
+            border-color: #ff00ff;
+            background: rgba(255, 0, 255, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        button {
+            background: linear-gradient(45deg, #00f5ff, #ff00ff);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1em;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 20px rgba(0, 245, 255, 0.4);
+            font-weight: 600;
+            position: relative;
+            z-index: 1;
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 30px rgba(0, 245, 255, 0.6);
+        }
+
+        button:active {
+            transform: translateY(-1px);
+        }
+
+        .console-selector {
+            padding: 12px 20px;
+            font-size: 1.1em;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(0, 245, 255, 0.5);
+            border-radius: 10px;
+            color: white;
+            margin: 20px 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .console-selector:hover {
+            border-color: #00f5ff;
+            background: rgba(0, 245, 255, 0.1);
+        }
+
+        #game {
+            width: 100%;
+            height: 600px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 245, 255, 0.3);
+            margin: 20px 0;
+        }
+
+        .info-box {
+            background: rgba(0, 245, 255, 0.05);
+            border-left: 4px solid #00f5ff;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            animation: fadeIn 1s ease;
+        }
+
+        .info-box h3 {
+            color: #00f5ff;
+            margin-bottom: 10px;
+        }
+
+        .info-box p {
+            color: #ccc;
+            line-height: 1.6;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+
+        .log-display {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 245, 255, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #00f5ff;
+            margin: 20px 0;
+        }
+
+        .log-entry {
+            padding: 5px;
+            border-bottom: 1px solid rgba(0, 245, 255, 0.1);
+        }
+
+        .timestamp {
+            color: #888;
+            font-size: 0.85em;
+        }
+
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.6; }
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(45deg, #00f5ff, #ff00ff);
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="logo">WEBMULATOR PRO</h1>
+            <p class="subtitle">Modern Retro Gaming Emulator</p>
+            <a href="https://instagram.com/12moneyy" target="_blank" class="social-link">
+                📸 Follow @12moneyy on Instagram
+            </a>
+        </div>
+
+        <div class="main-card">
+            <div id="welcomeSection">
+                <div class="upload-zone" id="uploadZone">
+                    <div class="upload-icon">🎮</div>
+                    <h2>Drop ROM File Here</h2>
+                    <p style="color: #888; margin: 15px 0;">or</p>
+                    <input type="file" id="input" hidden>
+                    <button id="uploadbutton">Browse Files</button>
+                </div>
+
+                <div class="info-box">
+                    <h3>What is Webmulator Pro?</h3>
+                    <p>A modern, feature-rich retro gaming emulator supporting multiple console platforms. Upload your ROM files and start playing instantly. All gameplay sessions are tracked and can be exported for review.</p>
+                </div>
+            </div>
+
+            <div id="gameSection" style="display: none;">
+                <div id="game"></div>
+                
+                <div class="controls">
+                    <button id="downloadLog">📥 Download Activity Log</button>
+                    <button id="newGame">🔄 Load New ROM</button>
+                </div>
+
+                <div class="info-box">
+                    <h3 id="gameTitle">Game Information</h3>
+                    <p id="gameInfo">Your gaming session is being tracked. All interactions are logged and can be downloaded.</p>
+                </div>
+
+                <details style="margin-top: 20px;">
+                    <summary style="cursor: pointer; color: #00f5ff; font-weight: bold; padding: 10px;">View Activity Log</summary>
+                    <div class="log-display" id="logDisplay"></div>
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Activity Logger
+        const activityLog = [];
+        
+        function logActivity(action, details = {}) {
+            const entry = {
+                timestamp: new Date().toISOString(),
+                action: action,
+                details: details,
+                userAgent: navigator.userAgent,
+                screenResolution: `${window.innerWidth}x${window.innerHeight}`
+            };
+            activityLog.push(entry);
+            updateLogDisplay();
+        }
+
+        function updateLogDisplay() {
+            const logDisplay = document.getElementById('logDisplay');
+            if (logDisplay && activityLog.length > 0) {
+                const lastEntries = activityLog.slice(-20).reverse();
+                logDisplay.innerHTML = lastEntries.map(entry => 
+                    `<div class="log-entry">
+                        <span class="timestamp">[${new Date(entry.timestamp).toLocaleTimeString()}]</span> 
+                        ${entry.action}
+                    </div>`
+                ).join('');
+            }
+        }
+
+        // Initialize
+        logActivity('Page loaded');
+
+        // File upload handling
+        const input = document.getElementById('input');
+        const uploadButton = document.getElementById('uploadbutton');
+        const uploadZone = document.getElementById('uploadZone');
+
+        uploadButton.addEventListener('click', () => {
+            input.click();
+            logActivity('Upload button clicked');
+        });
+
+        uploadZone.addEventListener('click', (e) => {
+            if (e.target === uploadZone || e.target.classList.contains('upload-icon') || e.target.tagName === 'H2') {
+                input.click();
+                logActivity('Upload zone clicked');
+            }
+        });
+
+        // Drag and drop
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.setAttribute('drag', 'true');
+            logActivity('File dragged over upload zone');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.removeAttribute('drag');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.removeAttribute('drag');
+            if (e.dataTransfer.files.length) {
+                input.files = e.dataTransfer.files;
+                input.dispatchEvent(new Event('change'));
+                logActivity('File dropped', { fileName: e.dataTransfer.files[0].name });
+            }
+        });
+
+        // ROM loading
+        input.onchange = async () => {
+            const file = input.files[0];
+            const url = URL.createObjectURL(new Blob([file]));
+            const parts = file.name.split(".");
+            const fileName = parts[0];
+            const ext = parts.pop().toLowerCase();
+
+            logActivity('ROM file selected', { fileName: file.name, fileSize: file.size });
+
+            const core = await (async (ext) => {
+                if (["fds", "nes", "unif", "unf"].includes(ext)) return "nes";
+                if (["smc", "fig", "sfc", "gd3", "gd7", "dx2", "bsx", "swc"].includes(ext)) return "snes";
+                if (["z64", "n64"].includes(ext)) return "n64";
+                if (["nds", "gba", "gb"].includes(ext)) return ext;
+
+                return await new Promise(resolve => {
+                    const cores = {
+                        "Nintendo 64": "n64",
+                        "Nintendo Game Boy": "gb",
+                        "Nintendo Game Boy Advance": "gba",
+                        "Nintendo DS": "nds",
+                        "Nintendo Entertainment System": "nes",
+                        "Super Nintendo Entertainment System": "snes",
+                        "PlayStation": "psx",
+                        "Virtual Boy": "vb",
+                        "Sega Mega Drive": "segaMD",
+                        "Sega Master System": "segaMS",
+                        "Sega CD": "segaCD",
+                        "Atari Lynx": "lynx",
+                        "Sega 32X": "sega32x",
+                        "Atari Jaguar": "jaguar",
+                        "Sega Game Gear": "segaGG",
+                        "Sega Saturn": "segaSaturn",
+                        "Atari 7800": "atari7800",
+                        "Atari 2600": "atari2600"
+                    };
+
+                    const modal = document.createElement('div');
+                    modal.innerHTML = `
+                        <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                                    background: rgba(10, 10, 10, 0.95); padding: 40px; border-radius: 20px; 
+                                    border: 2px solid #00f5ff; z-index: 1000; text-align: center;">
+                            <h2 style="color: #00f5ff; margin-bottom: 20px;">Select Console</h2>
+                            <select class="console-selector" id="coreSelect">
+                                ${Object.entries(cores).map(([name, value]) => 
+                                    `<option value="${value}">${name}</option>`
+                                ).join('')}
+                            </select>
+                            <br><br>
+                            <button id="loadBtn">Load Game</button>
+                        </div>
+                    `;
+                    document.body.appendChild(modal);
+
+                    document.getElementById('loadBtn').onclick = () => {
+                        const selected = document.getElementById('coreSelect').value;
+                        logActivity('Console selected', { console: selected });
+                        document.body.removeChild(modal);
+                        resolve(selected);
+                    };
+                });
+            })(ext);
+
+            logActivity('Emulator core selected', { core: core });
+
+            // Show game section
+            document.getElementById('welcomeSection').style.display = 'none';
+            document.getElementById('gameSection').style.display = 'block';
+            document.getElementById('gameTitle').textContent = `Now Playing: ${fileName}`;
+            document.getElementById('gameInfo').textContent = `Console: ${core.toUpperCase()} | Started: ${new Date().toLocaleString()}`;
+
+            // Initialize emulator
+            window.EJS_player = "#game";
+            window.EJS_gameName = fileName;
+            window.EJS_biosUrl = "";
+            window.EJS_gameUrl = url;
+            window.EJS_core = core;
+            window.EJS_pathtodata = "https://rawcdn.githack.com/EmulatorJS/EmulatorJS/main/data/";
+            window.EJS_startOnLoaded = true;
+
+            const script = document.createElement("script");
+            script.src = "https://rawcdn.githack.com/EmulatorJS/EmulatorJS/main/data/loader.js";
+            script.onload = () => {
+                logActivity('Emulator loaded successfully', { game: fileName, core: core });
+            };
+            document.body.appendChild(script);
+        };
+
+        // Download log
+        document.getElementById('downloadLog').addEventListener('click', () => {
+            const logData = {
+                exportDate: new Date().toISOString(),
+                totalActions: activityLog.length,
+                sessionDuration: activityLog.length > 0 ? 
+                    (new Date() - new Date(activityLog[0].timestamp)) / 1000 / 60 : 0,
+                activities: activityLog
+            };
+
+            const blob = new Blob([JSON.stringify(logData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `webmulator_activity_${Date.now()}.savefile`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            logActivity('Activity log downloaded');
+        });
+
+        // New game
+        document.getElementById('newGame').addEventListener('click', () => {
+            logActivity('New game requested - page reload');
+            location.reload();
+        });
+
+        // Track mouse movements
+        let lastMouseLog = 0;
+        document.addEventListener('mousemove', (e) => {
+            const now = Date.now();
+            if (now - lastMouseLog > 5000) { // Log every 5 seconds
+                logActivity('Mouse activity', { x: e.clientX, y: e.clientY });
+                lastMouseLog = now;
+            }
+        });
+
+        // Track clicks
+        document.addEventListener('click', (e) => {
+            logActivity('Click event', { 
+                element: e.target.tagName, 
+                id: e.target.id || 'none',
+                position: `${e.clientX},${e.clientY}`
+            });
+        });
+
+        // Track visibility changes
+        document.addEventListener('visibilitychange', () => {
+            logActivity(document.hidden ? 'Tab hidden' : 'Tab visible');
+        });
+
+        // Track window resize
+        window.addEventListener('resize', () => {
+            logActivity('Window resized', { 
+                dimensions: `${window.innerWidth}x${window.innerHeight}` 
+            });
+        });
+
+        // Track beforeunload
+        window.addEventListener('beforeunload', () => {
+            logActivity('User leaving page');
+        });
+    </script>
+</body>
+</html>
