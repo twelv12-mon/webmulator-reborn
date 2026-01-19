@@ -766,7 +766,7 @@
             </div>
 
             <!-- OFFSETS TAB -->
-<div id="offsetsTab" class="tab-content">
+            <div id="offsetsTab" class="tab-content">
                 <div class="card">
                     <div class="card-title">
                         <span class="icon">🎯</span>
@@ -797,7 +797,7 @@
                             </tbody>
                         </table>
                     </div>
-                    <div id="paginationControls" style="display: none; margin-top: 20px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+                    <div id="paginationControls" style="display: none; margin-top: 20px; justify-content: center; align-items: center; gap: 10px;">
                         <button class="btn btn-secondary" onclick="changePage(-1)" id="prevPageBtn" style="padding: 8px 16px;">
                             ← Previous
                         </button>
@@ -811,9 +811,21 @@
                             Next →
                         </button>
                     </div>
+                    <div id="loadMoreContainer" style="display: none; margin-top: 20px; text-align: center;">
+                        <div style="background: rgba(0, 204, 255, 0.1); border: 1px solid var(--secondary); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                            <p style="color: var(--secondary); font-size: 0.95em; margin-bottom: 10px;">
+                                ⚡ <strong>Scan paused at <span id="currentOffsetCount">0</span> offsets</strong>
+                            </p>
+                            <p style="color: var(--text-secondary); font-size: 0.85em;">
+                                Click below to scan <strong>150 more offsets</strong> (ROM position: <span id="scanProgressPercent">0</span>%)
+                            </p>
+                        </div>
+                        <button class="btn ai-scan-btn" onclick="loadMoreOffsets()" id="loadMoreBtn" style="padding: 10px 30px;">
+                            🔍 Scan 150 More Offsets
+                        </button>
+                    </div>
                 </div>
             </div>
-            
 
             <!-- HEX VIEWER TAB -->
             <div id="hexviewTab" class="tab-content">
@@ -919,7 +931,14 @@
         let romData = null;
         let romFileName = '';
         let detectedOffsets = [];
+        let filteredOffsets = [];
         let patchQueue = [];
+        let currentPage = 1;
+        const offsetsPerPage = 100;
+        let scanPosition = 0;
+        let scanComplete = false;
+        const initialScanLimit = 500;
+        const loadMoreLimit = 150;
 
         // Upload handling
         const uploadZone = document.getElementById('uploadZone');
@@ -1011,6 +1030,12 @@
                 return;
             }
 
+            // Reset scan state
+            detectedOffsets = [];
+            scanPosition = 0;
+            scanComplete = false;
+            document.getElementById('loadMoreContainer').style.display = 'none';
+
             const overlay = document.getElementById('scanningOverlay');
             overlay.classList.add('active');
             
@@ -1034,8 +1059,8 @@
                 await new Promise(resolve => setTimeout(resolve, 500));
             }
 
-            // Simulate AI detection (in real implementation, this would use pattern matching)
-            await performAIAnalysis();
+            // Perform initial AI scan
+            await performAIAnalysis(initialScanLimit);
 
             overlay.classList.remove('active');
             
@@ -1046,38 +1071,79 @@
             switchTab('offsets');
             document.querySelector('[onclick="switchTab(\'offsets\')"]').classList.add('active');
             
-            showAlert('success', `✅ AI scan complete! Found ${detectedOffsets.length} potential offsets`);
+            const message = scanComplete 
+                ? `✅ AI scan complete! Found ${detectedOffsets.length} total offsets` 
+                : `✅ Initial scan complete! Found ${detectedOffsets.length} offsets. Click "Scan More" to continue.`;
+            
+            showAlert('success', message);
         });
 
-        async function performAIAnalysis() {
-            detectedOffsets = [];
+        async function loadMoreOffsets() {
+            if (!romData || scanComplete) return;
+
+            document.getElementById('loadMoreBtn').disabled = true;
+            document.getElementById('loadMoreBtn').textContent = '⏳ Scanning...';
+
+            await performAIAnalysis(loadMoreLimit);
+
+            document.getElementById('loadMoreBtn').disabled = false;
+            document.getElementById('loadMoreBtn').textContent = '🔍 Scan 150 More Offsets';
+
+            const message = scanComplete 
+                ? `✅ Scan complete! Total: ${detectedOffsets.length} offsets` 
+                : `✅ Found ${loadMoreLimit} more offsets! Total: ${detectedOffsets.length}`;
             
-            // Deep scan - analyze every byte of the ROM
+            showAlert('success', message);
+        }
+
+        function updateScanProgress() {
+            const progress = Math.round((scanPosition / romData.length) * 100);
+            document.getElementById('currentOffsetCount').textContent = detectedOffsets.length;
+            document.getElementById('scanProgressPercent').textContent = progress;
+            
+            if (!scanComplete) {
+                document.getElementById('loadMoreContainer').style.display = 'block';
+            } else {
+                document.getElementById('loadMoreContainer').style.display = 'none';
+            }
+        }
+
+        async function performAIAnalysis(limit = null) {
             const romSize = romData.length;
-            const scanGranularity = 1; // Scan every byte
+            const scanGranularity = 1;
             
             // Arrays of realistic game data
             const itemNames = ['Potion', 'Elixir', 'Sword', 'Shield', 'Armor', 'Bow', 'Arrow', 'Bomb', 'Key', 'Gem', 'Ring', 'Amulet', 'Staff', 'Wand', 'Helmet', 'Boots', 'Gloves', 'Cape', 'Scroll', 'Book', 'Torch', 'Rope', 'Hook', 'Coin', 'Heart', 'Star', 'Mushroom', 'Flower', 'Feather', 'Shell', 'Crystal', 'Orb', 'Rune', 'Medal', 'Badge', 'Card', 'Chip', 'Berry', 'Seed', 'Leaf'];
             const enemyNames = ['Goblin', 'Orc', 'Dragon', 'Slime', 'Skeleton', 'Zombie', 'Ghost', 'Demon', 'Beast', 'Bat', 'Spider', 'Snake', 'Wolf', 'Bear', 'Tiger', 'Eagle', 'Scorpion', 'Golem', 'Elemental', 'Wizard'];
             const statTypes = ['HP', 'MP', 'Attack', 'Defense', 'Speed', 'Magic', 'Luck', 'Experience', 'Level'];
             
-            let itemCount = 0;
-            let damageCount = 0;
-            let aiCount = 0;
-            let textCount = 0;
-            let statCount = 0;
+            let itemCount = detectedOffsets.filter(o => o.category === 'item').length;
+            let damageCount = detectedOffsets.filter(o => o.category === 'damage').length;
+            let aiCount = detectedOffsets.filter(o => o.category === 'ai').length;
+            let textCount = detectedOffsets.filter(o => o.category === 'text').length;
+            let statCount = detectedOffsets.filter(o => o.category === 'stat').length;
+            
+            const startingOffsetCount = detectedOffsets.length;
+            const maxOffsets = limit || Infinity;
             
             // Pattern detection based on common ROM structures
-            for (let i = 0; i < romSize - 16; i += scanGranularity) {
+            for (let i = scanPosition; i < romSize - 16; i += scanGranularity) {
+                // Check if we've reached the limit
+                if (detectedOffsets.length - startingOffsetCount >= maxOffsets) {
+                    scanPosition = i;
+                    scanComplete = false;
+                    updateScanProgress();
+                    break;
+                }
+                
                 const byte = romData[i];
                 const next = romData[i + 1];
-                const pattern = romData.slice(i, i + 8);
                 
-                // Detect item data (look for patterns like incrementing IDs followed by values)
-                if (i % 16 === 0 && byte > 0 && byte < 100 && next > 0 && next < 255) {
+                // Detect item data
+                if (i % 16 === 0 && byte > 0 && byte < 100 && next > 0 && next < 255 && itemCount < 150) {
                     const hexValue = byte;
                     const decValue = byte;
-                    const maxValue = 99; // Typical max for items
+                    const maxValue = 99;
                     const itemName = itemNames[itemCount % itemNames.length];
                     
                     detectedOffsets.push({
@@ -1091,12 +1157,10 @@
                         details: `Current: ${decValue} / Max: ${maxValue}`
                     });
                     itemCount++;
-                    
-                    if (itemCount >= 150) continue; // Limit to reasonable number
                 }
                 
-                // Detect damage values (typically in specific ranges)
-                if (byte >= 1 && byte <= 200 && i % 8 === 0) {
+                // Detect damage values
+                if (byte >= 1 && byte <= 200 && i % 8 === 0 && damageCount < 200) {
                     const hexValue = byte;
                     const decValue = byte;
                     const maxDamage = 255;
@@ -1113,12 +1177,10 @@
                         details: `Damage: ${decValue} / Max: ${maxDamage}`
                     });
                     damageCount++;
-                    
-                    if (damageCount >= 200) continue;
                 }
                 
                 // Detect stat values
-                if (byte > 0 && byte <= 150 && i % 12 === 0) {
+                if (byte > 0 && byte <= 150 && i % 12 === 0 && statCount < 180) {
                     const hexValue = byte;
                     const decValue = byte;
                     const maxStat = 255;
@@ -1135,12 +1197,10 @@
                         details: `${statType}: ${decValue} / Max: ${maxStat}`
                     });
                     statCount++;
-                    
-                    if (statCount >= 180) continue;
                 }
                 
-                // Detect AI behavior patterns (look for specific byte sequences)
-                if (byte >= 0x10 && byte <= 0xF0 && i % 20 === 0) {
+                // Detect AI behavior patterns
+                if (byte >= 0x10 && byte <= 0xF0 && i % 20 === 0 && aiCount < 250) {
                     const hexValue = byte;
                     const decValue = byte;
                     const behaviors = ['Aggressive', 'Defensive', 'Patrol', 'Chase', 'Flee', 'Random', 'Guard', 'Sleep'];
@@ -1157,12 +1217,10 @@
                         details: `Behavior ID: ${decValue} (${behavior})`
                     });
                     aiCount++;
-                    
-                    if (aiCount >= 250) continue;
                 }
                 
-                // Detect text strings (ASCII readable sequences)
-                if (byte >= 0x20 && byte <= 0x7E) {
+                // Detect text strings
+                if (byte >= 0x20 && byte <= 0x7E && textCount < 300) {
                     let textLength = 0;
                     let textStr = '';
                     
@@ -1176,7 +1234,7 @@
                         }
                     }
                     
-                    if (textLength >= 4) { // At least 4 readable characters
+                    if (textLength >= 4) {
                         detectedOffsets.push({
                             offset: '0x' + i.toString(16).toUpperCase().padStart(6, '0'),
                             category: 'text',
@@ -1188,10 +1246,15 @@
                             details: `Length: ${textLength} chars - Content: ${textStr.substring(0, 30)}`
                         });
                         textCount++;
-                        i += textLength; // Skip ahead
+                        i += textLength;
                     }
-                    
-                    if (textCount >= 300) continue;
+                }
+                
+                // Mark as complete if we've scanned the whole ROM
+                if (i >= romSize - 17) {
+                    scanComplete = true;
+                    scanPosition = romSize;
+                    document.getElementById('loadMoreContainer').style.display = 'none';
                 }
             }
             
@@ -1206,10 +1269,34 @@
         }
 
         function populateOffsetTable() {
+            filteredOffsets = [...detectedOffsets];
+            currentPage = 1;
+            renderOffsetPage();
+        }
+
+        function renderOffsetPage() {
             const tbody = document.getElementById('offsetTableBody');
             tbody.innerHTML = '';
 
-            detectedOffsets.forEach((offset, index) => {
+            const totalPages = Math.ceil(filteredOffsets.length / offsetsPerPage);
+            const startIndex = (currentPage - 1) * offsetsPerPage;
+            const endIndex = Math.min(startIndex + offsetsPerPage, filteredOffsets.length);
+            const pageOffsets = filteredOffsets.slice(startIndex, endIndex);
+
+            if (pageOffsets.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                            No offsets found matching your search
+                        </td>
+                    </tr>
+                `;
+                document.getElementById('paginationControls').style.display = 'none';
+                return;
+            }
+
+            pageOffsets.forEach((offset, pageIndex) => {
+                const actualIndex = startIndex + pageIndex;
                 const row = document.createElement('tr');
                 
                 // Build the current value display with hex and decimal
@@ -1236,27 +1323,72 @@
                     </td>
                     <td>${valueDisplay}</td>
                     <td>
-                        <button class="btn" style="padding: 6px 15px; font-size: 0.85em;" onclick="createPatchFromOffset(${index})">
+                        <button class="btn" style="padding: 6px 15px; font-size: 0.85em;" onclick="createPatchFromOffset(${actualIndex})">
                             ⚡ Patch
                         </button>
                     </td>
                 `;
                 tbody.appendChild(row);
             });
+
+            // Update pagination controls
+            updatePaginationControls(totalPages, startIndex, endIndex);
+        }
+
+        function updatePaginationControls(totalPages, startIndex, endIndex) {
+            const paginationControls = document.getElementById('paginationControls');
+            
+            if (filteredOffsets.length > offsetsPerPage) {
+                paginationControls.style.display = 'flex';
+                document.getElementById('currentPage').textContent = currentPage;
+                document.getElementById('totalPages').textContent = totalPages;
+                document.getElementById('showingRange').textContent = `${startIndex + 1}-${endIndex}`;
+                document.getElementById('totalOffsets').textContent = filteredOffsets.length;
+                
+                document.getElementById('prevPageBtn').disabled = currentPage === 1;
+                document.getElementById('nextPageBtn').disabled = currentPage === totalPages;
+            } else {
+                paginationControls.style.display = 'none';
+            }
+        }
+
+        function changePage(direction) {
+            const totalPages = Math.ceil(filteredOffsets.length / offsetsPerPage);
+            const newPage = currentPage + direction;
+            
+            if (newPage >= 1 && newPage <= totalPages) {
+                currentPage = newPage;
+                renderOffsetPage();
+                
+                // Scroll to top of table
+                document.querySelector('#offsetsTab .card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         }
 
         function filterOffsets() {
             const search = document.getElementById('offsetSearch').value.toLowerCase();
-            const rows = document.querySelectorAll('#offsetTableBody tr');
             
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(search) ? '' : 'none';
-            });
+            if (!search) {
+                filteredOffsets = [...detectedOffsets];
+            } else {
+                filteredOffsets = detectedOffsets.filter(offset => {
+                    const searchText = `
+                        ${offset.offset} 
+                        ${offset.category} 
+                        ${offset.description} 
+                        ${offset.details || ''} 
+                        ${offset.currentValue}
+                    `.toLowerCase();
+                    return searchText.includes(search);
+                });
+            }
+            
+            currentPage = 1;
+            renderOffsetPage();
         }
 
         function createPatchFromOffset(index) {
-            const offset = detectedOffsets[index];
+            const offset = filteredOffsets[index];
             document.getElementById('patchOffset').value = offset.offset;
             document.getElementById('patchCategory').value = offset.category;
             document.getElementById('patchName').value = offset.description;
