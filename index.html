@@ -30,7 +30,7 @@
         /* ── SIDEBAR ── */
         #sidebar {
             width: var(--sidebar-w);
-            min-height: 100vh;
+            height: 100vh;
             background: var(--bg2);
             border-right: 1px solid var(--border);
             display: flex;
@@ -41,6 +41,7 @@
             transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
             z-index: 200;
             box-shadow: 4px 0 40px rgba(0,245,255,0.07);
+            overflow: hidden;
         }
 
         #sidebar.open {
@@ -93,9 +94,15 @@
             padding: 6px 10px 20px;
         }
 
-        #romList::-webkit-scrollbar { width: 4px; }
-        #romList::-webkit-scrollbar-track { background: transparent; }
-        #romList::-webkit-scrollbar-thumb { background: rgba(0,245,255,0.2); border-radius: 4px; }
+        #romList::-webkit-scrollbar { width: 5px; }
+        #romList::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); border-radius: 4px; }
+        #romList::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, rgba(0,245,255,0.4), rgba(255,0,255,0.25));
+            border-radius: 4px;
+        }
+        #romList::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, rgba(0,245,255,0.65), rgba(255,0,255,0.45));
+        }
 
         /* Console group header */
         .rom-group-label {
@@ -180,30 +187,87 @@
         }
 
         .sidebar-footer {
-            padding: 16px 14px;
+            padding: 14px 14px;
             border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
         .load-folder-btn {
             width: 100%;
-            padding: 11px;
-            background: rgba(0,245,255,0.07);
-            border: 1px solid rgba(0,245,255,0.25);
+            padding: 10px;
+            background: rgba(0,245,255,0.05);
+            border: 1px solid rgba(0,245,255,0.2);
             border-radius: 10px;
-            color: var(--cyan);
+            color: #888;
             font-family: 'Rajdhani', sans-serif;
-            font-size: 0.9em;
+            font-size: 0.82em;
             font-weight: 600;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.07em;
             cursor: pointer;
             transition: all 0.2s;
             text-transform: uppercase;
         }
 
         .load-folder-btn:hover {
-            background: rgba(0,245,255,0.13);
+            background: rgba(0,245,255,0.1);
+            border-color: rgba(0,245,255,0.4);
+            color: var(--cyan);
+        }
+
+        .reload-github-btn {
+            width: 100%;
+            padding: 10px;
+            background: rgba(0,245,255,0.07);
+            border: 1px solid rgba(0,245,255,0.25);
+            border-radius: 10px;
+            color: var(--cyan);
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 0.82em;
+            font-weight: 600;
+            letter-spacing: 0.07em;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .reload-github-btn:hover {
+            background: rgba(0,245,255,0.14);
             border-color: var(--cyan);
-            box-shadow: 0 0 16px rgba(0,245,255,0.15);
+            box-shadow: 0 0 14px rgba(0,245,255,0.15);
+        }
+
+        .sidebar-source-tag {
+            text-align: center;
+            font-size: 0.72em;
+            color: #333;
+            letter-spacing: 0.06em;
+        }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 14px; height: 14px;
+            border: 2px solid rgba(0,245,255,0.2);
+            border-top-color: var(--cyan);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .loading-state {
+            text-align: center;
+            padding: 36px 20px;
+            color: #555;
+            font-size: 0.9em;
         }
 
         /* ── SIDEBAR TOGGLE ── */
@@ -544,7 +608,12 @@
         </div>
 
         <div class="sidebar-footer">
-            <button class="load-folder-btn" id="loadFolderBtn">📁 &nbsp;Open ROMs Folder</button>
+            <button class="reload-github-btn" id="reloadGithubBtn">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                Refresh from GitHub
+            </button>
+            <button class="load-folder-btn" id="loadFolderBtn">📁 &nbsp;Load Local Folder Instead</button>
+            <div class="sidebar-source-tag" id="sourceTag">twelv12-mon / webmulator-reborn</div>
         </div>
     </div>
 
@@ -595,10 +664,18 @@
     </div>
 
     <script>
+    // ── Constants ────────────────────────────────────────────────
+    const GITHUB_OWNER = 'twelv12-mon';
+    const GITHUB_REPO  = 'webmulator-reborn';
+    const GITHUB_BRANCH = 'main';
+    const GITHUB_PATH  = 'roms';
+    const GITHUB_API   = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_PATH}`;
+    const RAW_BASE     = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${GITHUB_PATH}/`;
+
     // ── Activity Logger ──────────────────────────────────────────
     const activityLog = [];
     function logActivity(action, details = {}) {
-        activityLog.push({ timestamp: new Date().toISOString(), action, details, userAgent: navigator.userAgent });
+        activityLog.push({ timestamp: new Date().toISOString(), action, details });
         updateLogDisplay();
     }
     function updateLogDisplay() {
@@ -617,18 +694,14 @@
         z64:'n64', n64:'n64',
         nds:'nds', gba:'gba', gb:'gb',
         md:'segaMD', gen:'segaMD',
-        sms:'segaMS',
-        gg:'segaGG',
+        sms:'segaMS', gg:'segaGG',
         psx:'psx', bin:'psx', iso:'psx',
-        vb:'vb',
-        lnx:'lynx',
-        j64:'jaguar',
-        a78:'atari7800',
-        a26:'atari2600'
+        vb:'vb', lnx:'lynx', j64:'jaguar',
+        a78:'atari7800', a26:'atari2600'
     };
 
     const CONSOLE_ICONS = {
-        nes:'🎮', snes:'🎮', n64:'🕹️', nds:'📱', gba:'📟', gb:'🟩',
+        nes:'🎮', snes:'🕹️', n64:'🕹️', nds:'📱', gba:'📟', gb:'🟩',
         segaMD:'🦔', segaMS:'🎮', segaGG:'📺', segaCD:'💿', sega32x:'🔴',
         psx:'🔵', vb:'🔴', lynx:'📺', jaguar:'🐆', atari7800:'👾', atari2600:'👾', segaSaturn:'🪐'
     };
@@ -640,31 +713,87 @@
         jaguar:'Atari Jaguar', atari7800:'Atari 7800', atari2600:'Atari 2600', segaSaturn:'Sega Saturn'
     };
 
+    const ALL_CORES = {
+        "Nintendo 64":"n64","Nintendo Game Boy":"gb","Nintendo Game Boy Advance":"gba",
+        "Nintendo DS":"nds","Nintendo Entertainment System":"nes","Super Nintendo":"snes",
+        "PlayStation":"psx","Virtual Boy":"vb","Sega Mega Drive":"segaMD","Sega Master System":"segaMS",
+        "Sega CD":"segaCD","Atari Lynx":"lynx","Sega 32X":"sega32x","Atari Jaguar":"jaguar",
+        "Sega Game Gear":"segaGG","Sega Saturn":"segaSaturn","Atari 7800":"atari7800","Atari 2600":"atari2600"
+    };
+
     function extToCore(ext) { return EXT_CORE_MAP[ext.toLowerCase()] || null; }
 
     // ── Sidebar toggle ───────────────────────────────────────────
-    const sidebar = document.getElementById('sidebar');
+    const sidebar  = document.getElementById('sidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
-    const overlay = document.getElementById('overlay');
+    const overlay  = document.getElementById('overlay');
 
-    function openSidebar() { sidebar.classList.add('open'); document.body.classList.add('sidebar-open'); }
+    function openSidebar()  { sidebar.classList.add('open');    document.body.classList.add('sidebar-open'); }
     function closeSidebar() { sidebar.classList.remove('open'); document.body.classList.remove('sidebar-open'); }
 
     toggleBtn.addEventListener('click', () => sidebar.classList.contains('open') ? closeSidebar() : openSidebar());
     overlay.addEventListener('click', closeSidebar);
-    document.getElementById('openLibraryHint').addEventListener('click', () => { openSidebar(); });
+    document.getElementById('openLibraryHint').addEventListener('click', openSidebar);
 
-    // ── ROM folder loading ───────────────────────────────────────
+    // ── ROM list state ───────────────────────────────────────────
+    // Each rom entry: { name, ext, core, url } (url = raw github or blob)
     let romFiles = [];
+    let currentSource = 'github'; // 'github' | 'local'
 
     const IGNORED_NAMES = ['readme.md'];
-    const IGNORED_EXTS  = ['state', 'md', 'txt', 'json', 'srm', 'sav', 'png', 'jpg'];
+    const IGNORED_EXTS  = ['state', 'srm', 'sav', 'md', 'txt', 'json', 'png', 'jpg', 'jpeg', 'gif'];
 
-    document.getElementById('loadFolderBtn').addEventListener('click', loadROMFolder);
+    // ── GitHub loader ────────────────────────────────────────────
+    async function loadFromGitHub() {
+        const list = document.getElementById('romList');
+        const countLabel = document.getElementById('romCountLabel');
+        const sourceTag  = document.getElementById('sourceTag');
 
-    async function loadROMFolder() {
+        list.innerHTML = `<div class="loading-state"><span class="spinner"></span> Fetching from GitHub…</div>`;
+        countLabel.textContent = '…';
+        sourceTag.textContent = `${GITHUB_OWNER} / ${GITHUB_REPO}`;
+
+        try {
+            const res = await fetch(GITHUB_API);
+            if (!res.ok) throw new Error(`GitHub API returned ${res.status}`);
+            const data = await res.json();
+
+            romFiles = [];
+            for (const item of data) {
+                if (item.type !== 'file') continue;
+                const name = item.name;
+                const lower = name.toLowerCase();
+                const ext   = lower.split('.').pop();
+                if (IGNORED_NAMES.includes(lower)) continue;
+                if (IGNORED_EXTS.includes(ext)) continue;
+                const core = extToCore(ext);
+                // Use the download_url from the API (raw.githubusercontent.com link)
+                const url = item.download_url;
+                romFiles.push({ name, ext, core, url, source: 'github' });
+            }
+
+            romFiles.sort((a, b) => a.name.localeCompare(b.name));
+            currentSource = 'github';
+            renderROMList(romFiles);
+            logActivity('GitHub ROMs loaded', { count: romFiles.length });
+        } catch (err) {
+            list.innerHTML = `<div class="empty-state"><p>⚠️ Could not load from GitHub.<br><small style="color:#555;">${err.message}</small></p></div>`;
+            countLabel.textContent = '—';
+            logActivity('GitHub load failed', { error: err.message });
+        }
+    }
+
+    // Auto-load on startup
+    loadFromGitHub();
+
+    document.getElementById('reloadGithubBtn').addEventListener('click', loadFromGitHub);
+
+    // ── Local folder loader ──────────────────────────────────────
+    document.getElementById('loadFolderBtn').addEventListener('click', loadLocalFolder);
+
+    async function loadLocalFolder() {
         if (!window.showDirectoryPicker) {
-            alert('Your browser does not support the File System Access API. Please use a modern Chromium-based browser (Chrome, Edge, Opera).');
+            alert('Local folder browsing requires a Chromium-based browser (Chrome, Edge, Opera).');
             return;
         }
         try {
@@ -672,37 +801,42 @@
             romFiles = [];
             for await (const entry of dirHandle.values()) {
                 if (entry.kind !== 'file') continue;
-                const name = entry.name;
-                const lowerName = name.toLowerCase();
-                const ext = lowerName.split('.').pop();
-                if (IGNORED_NAMES.includes(lowerName)) continue;
+                const name  = entry.name;
+                const lower = name.toLowerCase();
+                const ext   = lower.split('.').pop();
+                if (IGNORED_NAMES.includes(lower)) continue;
                 if (IGNORED_EXTS.includes(ext)) continue;
                 const file = await entry.getFile();
-                romFiles.push({ name, ext, file });
+                const url  = URL.createObjectURL(file);
+                const core = extToCore(ext);
+                romFiles.push({ name, ext, core, url, source: 'local' });
             }
             romFiles.sort((a, b) => a.name.localeCompare(b.name));
+            currentSource = 'local';
+            document.getElementById('sourceTag').textContent = `Local: ${dirHandle.name}`;
             renderROMList(romFiles);
-            logActivity('ROM folder loaded', { count: romFiles.length });
+            logActivity('Local folder loaded', { count: romFiles.length });
             openSidebar();
         } catch (e) {
             if (e.name !== 'AbortError') console.error(e);
         }
     }
 
+    // ── Render ROM list ──────────────────────────────────────────
     function renderROMList(files) {
-        const list = document.getElementById('romList');
+        const list       = document.getElementById('romList');
         const countLabel = document.getElementById('romCountLabel');
         countLabel.textContent = `${files.length} game${files.length !== 1 ? 's' : ''}`;
 
         if (files.length === 0) {
-            list.innerHTML = '<div class="empty-state"><p>No ROMs found in this folder.</p></div>';
+            list.innerHTML = '<div class="empty-state"><p>No ROMs found.</p></div>';
             return;
         }
 
-        // Group by console
+        // Group by console label
         const groups = {};
         files.forEach(rom => {
-            const core = extToCore(rom.ext) || 'unknown';
+            const core  = rom.core || 'unknown';
             const label = CONSOLE_NAMES[core] || 'Unknown';
             if (!groups[label]) groups[label] = [];
             groups[label].push({ ...rom, core });
@@ -712,7 +846,7 @@
         list.innerHTML = sortedGroups.map(([label, roms]) => `
             <div class="rom-group-label">${label}</div>
             ${roms.map(rom => `
-                <button class="rom-btn" data-name="${escHtml(rom.name)}" data-core="${rom.core}">
+                <button class="rom-btn" data-name="${escHtml(rom.name)}">
                     <span class="rom-icon">${CONSOLE_ICONS[rom.core] || '🎮'}</span>
                     <span class="rom-meta">
                         <span class="rom-name">${escHtml(rom.name.replace(/\.[^.]+$/, ''))}</span>
@@ -722,17 +856,26 @@
             `).join('')}
         `).join('');
 
-        // Attach click events
         list.querySelectorAll('.rom-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 const name = btn.dataset.name;
-                const rom = romFiles.find(r => r.name === name);
-                if (rom) {
-                    list.querySelectorAll('.rom-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    loadROM(rom.file, rom.core);
-                    closeSidebar();
+                const rom  = romFiles.find(r => r.name === name);
+                if (!rom) return;
+
+                list.querySelectorAll('.rom-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                let core = rom.core;
+                if (!core) core = await pickCore();
+                if (!core) return;
+
+                // For GitHub roms, url is already a direct link — pass it straight to EJS
+                if (rom.source === 'github') {
+                    loadROMFromURL(rom.url, rom.name, core);
+                } else {
+                    loadROMFromURL(rom.url, rom.name, core);
                 }
+                closeSidebar();
             });
         });
     }
@@ -740,63 +883,48 @@
     // Search filter
     document.getElementById('romSearch').addEventListener('input', e => {
         const q = e.target.value.toLowerCase();
-        const filtered = romFiles.filter(r => r.name.toLowerCase().includes(q));
-        renderROMList(filtered);
+        renderROMList(romFiles.filter(r => r.name.toLowerCase().includes(q)));
     });
 
     // ── File upload (browse / drag-drop) ─────────────────────────
-    const input = document.getElementById('input');
+    const input     = document.getElementById('input');
     const uploadZone = document.getElementById('uploadZone');
 
-    document.getElementById('uploadbutton').addEventListener('click', e => { e.stopPropagation(); input.click(); logActivity('Upload btn clicked'); });
-    uploadZone.addEventListener('click', e => { if (e.target === uploadZone || e.target.closest('.upload-icon') || e.target.tagName === 'H2') { input.click(); } });
+    document.getElementById('uploadbutton').addEventListener('click', e => { e.stopPropagation(); input.click(); });
+    uploadZone.addEventListener('click', e => { if (e.target === uploadZone || e.target.closest('.upload-icon') || e.target.tagName === 'H2') input.click(); });
     uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.style.borderColor = 'var(--magenta)'; });
     uploadZone.addEventListener('dragleave', () => { uploadZone.style.borderColor = ''; });
     uploadZone.addEventListener('drop', e => {
         e.preventDefault();
         uploadZone.style.borderColor = '';
-        if (e.dataTransfer.files.length) {
-            const file = e.dataTransfer.files[0];
-            input.files = e.dataTransfer.files;
-            logActivity('File dropped', { name: file.name });
-            handleFileInput(file);
-        }
+        if (e.dataTransfer.files.length) handleFileInput(e.dataTransfer.files[0]);
     });
-
     input.addEventListener('change', () => { if (input.files[0]) handleFileInput(input.files[0]); });
 
     async function handleFileInput(file) {
-        const parts = file.name.split('.');
-        const ext = parts.pop().toLowerCase();
-        let core = extToCore(ext);
+        const ext  = file.name.split('.').pop().toLowerCase();
+        let core   = extToCore(ext);
         if (!core) core = await pickCore();
         if (!core) return;
-        loadROM(file, core);
+        const url = URL.createObjectURL(file);
+        loadROMFromURL(url, file.name, core);
     }
 
     // ── Core picker modal ────────────────────────────────────────
-    const ALL_CORES = {
-        "Nintendo 64":"n64","Nintendo Game Boy":"gb","Nintendo Game Boy Advance":"gba",
-        "Nintendo DS":"nds","Nintendo Entertainment System":"nes","Super Nintendo":"snes",
-        "PlayStation":"psx","Virtual Boy":"vb","Sega Mega Drive":"segaMD","Sega Master System":"segaMS",
-        "Sega CD":"segaCD","Atari Lynx":"lynx","Sega 32X":"sega32x","Atari Jaguar":"jaguar",
-        "Sega Game Gear":"segaGG","Sega Saturn":"segaSaturn","Atari 7800":"atari7800","Atari 2600":"atari2600"
-    };
-
     function pickCore() {
         return new Promise(resolve => {
             const modal = document.createElement('div');
-            modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;display:flex;align-items:center;justify-content:center;';
+            modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;display:flex;align-items:center;justify-content:center;';
             modal.innerHTML = `
                 <div style="background:#0d0d1a;padding:36px;border-radius:18px;border:1px solid rgba(0,245,255,0.2);text-align:center;min-width:280px;">
-                    <h2 style="font-family:'Orbitron',monospace;font-size:0.85em;letter-spacing:0.15em;color:#00f5ff;margin-bottom:18px;">SELECT CONSOLE</h2>
+                    <h2 style="font-family:'Orbitron',monospace;font-size:0.8em;letter-spacing:0.15em;color:#00f5ff;margin-bottom:18px;">SELECT CONSOLE</h2>
                     <select class="console-selector" id="coreSelect" style="display:block;width:100%;margin:0 0 20px;">
                         ${Object.entries(ALL_CORES).map(([n,v]) => `<option value="${v}">${n}</option>`).join('')}
                     </select>
-                    <button class="btn-primary" id="loadBtn" style="font-size:0.72em;">Load Game</button>
+                    <button class="btn-primary" id="modalLoadBtn" style="font-size:0.72em;">Load Game</button>
                 </div>`;
             document.body.appendChild(modal);
-            document.getElementById('loadBtn').onclick = () => {
+            document.getElementById('modalLoadBtn').onclick = () => {
                 const v = document.getElementById('coreSelect').value;
                 document.body.removeChild(modal);
                 resolve(v);
@@ -804,38 +932,105 @@
         });
     }
 
-    // ── Load ROM into emulator ───────────────────────────────────
-    function loadROM(file, core) {
-        const fileName = file.name.replace(/\.[^.]+$/, '');
-        const url = URL.createObjectURL(new Blob([file]));
+    // ── Nuclear audio/emulator teardown ──────────────────────────
+    function destroyCurrentEmulator() {
+        // 1. Suspend + close every AudioContext on the page
+        if (window.AudioContext || window.webkitAudioContext) {
+            // EmulatorJS may attach its context to EJS_emulator or leave it hanging
+            try {
+                if (window.EJS_emulator && window.EJS_emulator.audioContext) {
+                    window.EJS_emulator.audioContext.close();
+                }
+            } catch(e) {}
 
-        logActivity('Loading ROM', { name: file.name, core });
+            // Hunt down any AudioContext instances stored in known EJS globals
+            ['EJS_emulator', 'EmulatorJS', 'EJS'].forEach(key => {
+                try {
+                    const obj = window[key];
+                    if (!obj) return;
+                    // Recurse one level for nested audio contexts
+                    Object.values(obj).forEach(v => {
+                        if (v && v.constructor && v.constructor.name === 'AudioContext') {
+                            try { v.close(); } catch(e) {}
+                        }
+                    });
+                } catch(e) {}
+            });
+        }
+
+        // 2. Stop + remove ALL audio and video elements in the page
+        document.querySelectorAll('audio, video').forEach(el => {
+            try {
+                el.pause();
+                el.src = '';
+                el.load();
+                el.remove();
+            } catch(e) {}
+        });
+
+        // 3. Stop all active MediaStream tracks (microphone/camera captures EJS may open)
+        if (navigator.mediaDevices) {
+            try {
+                document.querySelectorAll('audio[srcObject], video[srcObject]').forEach(el => {
+                    if (el.srcObject) {
+                        el.srcObject.getTracks().forEach(t => t.stop());
+                        el.srcObject = null;
+                    }
+                });
+            } catch(e) {}
+        }
+
+        // 4. Wipe EJS globals so the new loader starts completely fresh
+        const EJS_GLOBALS = [
+            'EJS_emulator','EJS_player','EJS_gameName','EJS_biosUrl','EJS_gameUrl',
+            'EJS_core','EJS_pathtodata','EJS_startOnLoaded','EmulatorJS','EJS_Buttons',
+            'EJS_VirtualGamepad','EJS_defaultOptions','EJS_cheats','EJS_netplayServer'
+        ];
+        EJS_GLOBALS.forEach(k => { try { delete window[k]; } catch(e) { window[k] = undefined; } });
+
+        // 5. Nuke the game container's entire DOM subtree
+        const gameEl = document.getElementById('game');
+        if (gameEl) {
+            // Clone-replace trick removes ALL event listeners attached to children
+            const fresh = gameEl.cloneNode(false);
+            gameEl.parentNode.replaceChild(fresh, gameEl);
+        }
+
+        // 6. Remove the old EJS loader script tag
+        const old = document.getElementById('ejsLoader');
+        if (old) old.remove();
+    }
+
+    // ── Launch emulator ──────────────────────────────────────────
+    function loadROMFromURL(gameUrl, fileName, core) {
+        const cleanName = fileName.replace(/\.[^.]+$/, '');
+        logActivity('Loading ROM', { name: fileName, core });
+
+        // Fully tear down whatever is running first
+        destroyCurrentEmulator();
 
         document.getElementById('welcomeSection').style.display = 'none';
         document.getElementById('gameSection').style.display = 'block';
-        document.getElementById('gameTitle').textContent = `Now Playing: ${fileName}`;
-        document.getElementById('gameInfo').textContent = `Console: ${(CONSOLE_NAMES[core] || core.toUpperCase())} · Started: ${new Date().toLocaleString()}`;
+        document.getElementById('gameTitle').textContent = `Now Playing: ${cleanName}`;
+        document.getElementById('gameInfo').textContent = `Console: ${CONSOLE_NAMES[core] || core.toUpperCase()} · Started: ${new Date().toLocaleString()}`;
 
-        // Reset emulator container
-        const gameEl = document.getElementById('game');
-        gameEl.innerHTML = '';
+        // Small delay — let the browser fully garbage-collect the old audio graph
+        // before we spin up a new one (prevents brief audio overlap on fast machines)
+        setTimeout(() => {
+            window.EJS_player         = '#game';
+            window.EJS_gameName       = cleanName;
+            window.EJS_biosUrl        = '';
+            window.EJS_gameUrl        = gameUrl;
+            window.EJS_core           = core;
+            window.EJS_pathtodata     = 'https://rawcdn.githack.com/EmulatorJS/EmulatorJS/main/data/';
+            window.EJS_startOnLoaded  = true;
 
-        window.EJS_player    = '#game';
-        window.EJS_gameName  = fileName;
-        window.EJS_biosUrl   = '';
-        window.EJS_gameUrl   = url;
-        window.EJS_core      = core;
-        window.EJS_pathtodata = 'https://rawcdn.githack.com/EmulatorJS/EmulatorJS/main/data/';
-        window.EJS_startOnLoaded = true;
-
-        const old = document.getElementById('ejsLoader');
-        if (old) old.remove();
-
-        const script = document.createElement('script');
-        script.id = 'ejsLoader';
-        script.src = 'https://rawcdn.githack.com/EmulatorJS/EmulatorJS/main/data/loader.js';
-        script.onload = () => logActivity('Emulator ready', { name: fileName, core });
-        document.body.appendChild(script);
+            const script = document.createElement('script');
+            script.id  = 'ejsLoader';
+            script.src = 'https://rawcdn.githack.com/EmulatorJS/EmulatorJS/main/data/loader.js?' + Date.now(); // bust cache
+            script.onload = () => logActivity('Emulator ready', { name: cleanName, core });
+            document.body.appendChild(script);
+        }, 120);
     }
 
     // ── Download log ─────────────────────────────────────────────
@@ -846,11 +1041,11 @@
         logActivity('Log downloaded');
     });
 
-    document.getElementById('newGame').addEventListener('click', () => { location.reload(); });
+    document.getElementById('newGame').addEventListener('click', () => location.reload());
 
     // ── Passive trackers ─────────────────────────────────────────
     let lastMouse = 0;
-    document.addEventListener('mousemove', e => { if (Date.now()-lastMouse>5000) { logActivity('Mouse', {x:e.clientX,y:e.clientY}); lastMouse=Date.now(); } });
+    document.addEventListener('mousemove', e => { if (Date.now()-lastMouse>5000) { logActivity('Mouse',{x:e.clientX,y:e.clientY}); lastMouse=Date.now(); } });
     document.addEventListener('visibilitychange', () => logActivity(document.hidden?'Tab hidden':'Tab visible'));
     window.addEventListener('beforeunload', () => logActivity('User leaving'));
 
